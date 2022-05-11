@@ -8,18 +8,127 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r loading, echo=TRUE, cache=TRUE, results='hide'}
+library(lubridate)
+library(dplyr)
+library(tidyr)
 
+rawData <- read.csv("activity.csv")
+processedData <- mutate(rawData,day = ymd(date),.keep = "unused", .before = "interval")
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r hist, echo= TRUE, cache=TRUE}
 
+pDatasummary <- processedData %>% group_by(day) %>% summarise(steps=sum(steps))
+pDatasummaryC <- pDatasummary[complete.cases(pDatasummary),]
+hist(pDatasummaryC$steps, main = "Total steps per day", xlab = "Number of steps")
+```
+
+The mean number of steps taken per day is 
+
+```{r mean, echo= TRUE, cache=TRUE}
+
+mean(pDatasummaryC$steps)
+``` 
+
+The median number of steps taken per day is
+
+```{r median, echo= TRUE, cache=TRUE}
+
+median(pDatasummaryC$steps)
+``` 
 
 ## What is the average daily activity pattern?
+```{r timeseries, echo= TRUE, cache=TRUE}
 
+processedData <- processedData %>% group_by(interval)
+pDatasummaryInterval <- summarise(processedData, steps=mean(steps, na.rm = TRUE))
+pDatasummaryIntervalC <- pDatasummaryInterval[complete.cases(pDatasummaryInterval),]
+
+
+library(ggplot2)
+p <- ggplot(pDatasummaryIntervalC, aes(x=interval, y=steps))
+
+p + geom_line() + labs(y = "Average steps across all days") + theme_classic()
+
+
+```
+
+
+Across all days, the interval with the most number of steps on average is
+
+```{r interval, echo= TRUE, cache=TRUE}
+
+pDatasummaryIntervalC$interval[which.max(pDatasummaryIntervalC$steps)]
+
+```
 
 
 ## Imputing missing values
 
 
+The total number of missing values is
+
+```{r missing, echo= TRUE, cache=TRUE}
+
+sum(is.na(processedData$steps))
+
+```
+Strategy to impute the missing data --> substitute the mean number of steps across all days for that 5-min interval. A new data set is created with the missing data filled in.
+
+```{r imputing, echo = TRUE, cache = TRUE}
+
+processedDataImp <- processedData %>% left_join(pDatasummaryIntervalC, by ="interval") %>% mutate(steps = coalesce(steps.x,steps.y)) %>%select(steps,day,interval)
+
+
+```
+
+
+Histogram of imputed results 
+
+```{r hist2, echo= TRUE, cache=TRUE}
+
+pDatasummaryImp <- processedDataImp %>% group_by(day) %>% summarise(steps=sum(steps))
+hist(pDatasummaryImp$steps, main = "Total steps per day (imputed)", xlab = "Number of steps")
+```
+
+After imputing the data, the mean number of steps taken per day is 
+
+```{r mean2, echo= TRUE, cache=TRUE}
+
+mean(pDatasummaryImp$steps)
+``` 
+
+After imputing the data, the median number of steps taken per day is
+
+```{r median2, echo= TRUE, cache=TRUE}
+
+median(pDatasummaryImp$steps)
+```
+
+The mean of the imputed data is identical to that of the raw data. The median and mean of the imputed data but the median of the imputed data is different that that of the raw data. 
+
+This makes sense since when data is missing, all the intervals are missing for the whole day. In other words, each day either has data for all the intervals or for non of them. Therefore, imputing on the interval level (which is done here) or on the day level will give the same result. 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r weekdays, echo=TRUE,cache=TRUE, fig.width= 12}
+
+weekend <- processedDataImp[weekdays(processedDataImp$day) %in% c("Saturday","Sunday"),]
+weekday <- processedDataImp[!weekdays(processedDataImp$day) %in% c("Saturday","Sunday"),]
+
+wdaySummaryInt <- weekday %>% group_by(interval) %>% summarise(steps=sum(steps))
+wendSummaryInt <- weekend %>% group_by(interval) %>% summarise(steps=sum(steps))
+
+combined <- left_join(wdaySummaryInt,wendSummaryInt,by = "interval", suffix = c("_weekday","_weekend"))
+final <-pivot_longer(combined,starts_with("steps"),names_to = "type", names_prefix = "steps_",names_transform = list(type = as.factor), values_to = "steps")
+
+
+library(lattice)
+
+xyplot(steps~interval|type,data = final, type = "l")
+
+```
+
