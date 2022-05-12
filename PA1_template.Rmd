@@ -120,8 +120,8 @@ This makes sense since when data is missing, all the intervals are missing for t
 weekend <- processedDataImp[weekdays(processedDataImp$day) %in% c("Saturday","Sunday"),]
 weekday <- processedDataImp[!weekdays(processedDataImp$day) %in% c("Saturday","Sunday"),]
 
-wdaySummaryInt <- weekday %>% group_by(interval) %>% summarise(steps=sum(steps))
-wendSummaryInt <- weekend %>% group_by(interval) %>% summarise(steps=sum(steps))
+wdaySummaryInt <- weekday %>% group_by(interval) %>% summarise(steps=mean(steps))
+wendSummaryInt <- weekend %>% group_by(interval) %>% summarise(steps=mean(steps))
 
 combined <- left_join(wdaySummaryInt,wendSummaryInt,by = "interval", suffix = c("_weekday","_weekend"))
 final <-pivot_longer(combined,starts_with("steps"),names_to = "type", names_prefix = "steps_",names_transform = list(type = as.factor), values_to = "steps")
